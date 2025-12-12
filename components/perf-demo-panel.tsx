@@ -19,34 +19,20 @@ const fetchCommentsMetrics = async (postId: string, limit: number) => {
 };
 
 const PerfDemoPanel = ({ postId }: { postId: string }) => {
-  const { commentLimit, setCommentLimit } = usePerfSettings();
+  const { commentLimit, setCommentLimit, triggerRefresh, latestMetrics } =
+    usePerfSettings();
   const [status, setStatus] = useState<"idle" | "running">("idle");
   const [flushing, setFlushing] = useState(false);
-  const [result, setResult] = useState<{
-    scenario: string;
-    metrics: DevMetrics | null;
-    totalMs: number;
-  } | null>(null);
-  const scheduleReset = () => {
-    setTimeout(() => setResult(null), 7500);
-  };
 
-  const runScenario = async (label: string, requestCount: number) => {
+  const runScenario = async (requestCount: number) => {
     setStatus("running");
-    const start = performance.now();
     try {
-      const metricsResponses = await Promise.all(
+      await Promise.all(
         Array.from({ length: requestCount }, () =>
           fetchCommentsMetrics(postId, commentLimit)
         )
       );
-      const lastMetrics = metricsResponses[metricsResponses.length - 1] ?? null;
-      setResult({
-        scenario: label,
-        metrics: lastMetrics,
-        totalMs: performance.now() - start,
-      });
-      scheduleReset();
+      triggerRefresh();
     } finally {
       setStatus("idle");
     }
@@ -56,8 +42,7 @@ const PerfDemoPanel = ({ postId }: { postId: string }) => {
     setFlushing(true);
     try {
       await fetch("/api/dev/flush-badge-cache", { method: "POST" });
-      setResult({ scenario: "cache flushed", metrics: null, totalMs: 0 });
-      scheduleReset();
+      triggerRefresh();
     } finally {
       setFlushing(false);
     }
@@ -71,6 +56,13 @@ const PerfDemoPanel = ({ postId }: { postId: string }) => {
           <p className="text-xs text-muted-foreground">
             simulate cold / warm badge lookups
           </p>
+          {latestMetrics && (
+            <p className="text-xs text-muted-foreground mt-1">
+              last fetch: {latestMetrics.elapsedMs}ms ·{" "}
+              {latestMetrics.cacheHits} hits · {latestMetrics.cacheMisses}{" "}
+              misses · {latestMetrics.dbQueries} db
+            </p>
+          )}
         </div>
         <Button
           variant={"outline"}
@@ -105,7 +97,7 @@ const PerfDemoPanel = ({ postId }: { postId: string }) => {
           variant={"outline"}
           className="text-sm"
           disabled={status === "running"}
-          onClick={() => runScenario("Single request", 1)}
+          onClick={() => runScenario(1)}
         >
           single request
         </Button>
@@ -113,7 +105,7 @@ const PerfDemoPanel = ({ postId }: { postId: string }) => {
           variant={"outline"}
           className="text-sm"
           disabled={status === "running"}
-          onClick={() => runScenario("Burst x5", 5)}
+          onClick={() => runScenario(5)}
         >
           burst x5
         </Button>
@@ -121,23 +113,6 @@ const PerfDemoPanel = ({ postId }: { postId: string }) => {
 
       {status === "running" && (
         <p className="text-sm text-muted-foreground">running scenario…</p>
-      )}
-
-      {result && (
-        <div className="text-sm bg-muted rounded-xl p-3 flex flex-col gap-1">
-          <span className="font-medium">{result.scenario}</span>
-          {result.totalMs > 0 && (
-            <span>total time: {result.totalMs.toFixed(1)}ms</span>
-          )}
-          {result.metrics && (
-            <span className="text-muted-foreground">
-              cache hits: {result.metrics.cacheHits} · misses:{" "}
-              {result.metrics.cacheMisses} · db queries:{" "}
-              {result.metrics.dbQueries} · api elapsed:{" "}
-              {result.metrics.elapsedMs}ms
-            </span>
-          )}
-        </div>
       )}
     </div>
   );

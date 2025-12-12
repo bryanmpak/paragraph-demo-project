@@ -34,7 +34,7 @@ const formatRelativeTime = (timestamp: string) => {
 };
 
 const CommentsSection = ({ postId }: { postId: string }) => {
-  const { commentLimit } = usePerfSettings();
+  const { commentLimit, refreshKey, setLatestMetrics } = usePerfSettings();
   const [comments, setComments] = useState<Comment[]>([]);
   const [badges, setBadges] = useState<Record<string, Badge>>({});
   const [metrics, setMetrics] = useState<DevMetrics | null>(null);
@@ -56,7 +56,9 @@ const CommentsSection = ({ postId }: { postId: string }) => {
         if (cancelled) return;
         setComments(payload.comments);
         setBadges(payload.badges ?? {});
-        setMetrics(payload._devMetrics ?? null);
+        const devMetrics = payload._devMetrics ?? null;
+        setMetrics(devMetrics);
+        setLatestMetrics(devMetrics);
         setStatus("ready");
       } catch (error) {
         if (cancelled) return;
@@ -69,7 +71,7 @@ const CommentsSection = ({ postId }: { postId: string }) => {
     return () => {
       cancelled = true;
     };
-  }, [postId, commentLimit]);
+  }, [postId, commentLimit, refreshKey]);
 
   const badgeSummary = useMemo(() => {
     if (!metrics) return "";
@@ -89,10 +91,6 @@ const CommentsSection = ({ postId }: { postId: string }) => {
           <p className="text-xs text-muted-foreground">{badgeSummary}</p>
         ) : null}
       </header>
-
-      {status === "loading" && (
-        <p className="text-sm text-muted-foreground">Loading comments…</p>
-      )}
 
       {status === "error" && (
         <p className="text-sm text-destructive">
