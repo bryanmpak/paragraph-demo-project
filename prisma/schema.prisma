@@ -1,0 +1,94 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id              String   @id @default(cuid())
+  displayName     String
+  avatarUrl       String?
+  walletAddress   String?  @unique
+
+  writer          Writer?
+  comments        Comment[]
+  holdings        WriterCoinHolding[]
+  
+}
+
+model Writer {
+  id              String  @id @default(cuid())
+  userId          String  @unique
+
+  user            User    @relation(fields: [userId], references: [id])
+  posts           Post[]
+  coin            WriterCoin?
+
+}
+
+model Post {
+  id            String  @id @default(cuid())
+  writerId      String
+
+  title         String
+  body          String
+  createdAt     DateTime  @default(now())
+
+  writer        Writer  @relation(fields: [writerId], references: [id])
+  comments      Comment[]
+}
+
+model Comment {
+  id          String  @id @default(cuid())
+  postId      String
+  userId      String
+  body        String
+  createdAt   DateTime  @default(now())
+
+  post        Post  @relation(fields: [postId], references: [id])
+  user        User  @relation(fields: [userId], references: [id])
+}
+
+model WriterCoin {
+  id              String   @id @default(cuid())
+  writerId        String   @unique
+  contractAddress String   @unique
+  chainId         Int
+  createdAt       DateTime @default(now())
+
+  writer          Writer   @relation(fields: [writerId], references: [id])
+  holdings        WriterCoinHolding[]
+}
+
+model WriterCoinHolding {
+  id           String   @id @default(cuid())
+  writerCoinId String
+  userId       String
+  balance      Decimal  @default(0)
+  tier         String?
+  updatedAt    DateTime @updatedAt
+
+  writerCoin   WriterCoin @relation(fields: [writerCoinId], references: [id])
+  user         User       @relation(fields: [userId], references: [id])
+
+  @@unique([writerCoinId, userId])
+}
+
+model OnchainEvent {
+  id          String   @id @default(cuid())
+  txHash      String
+  logIndex    Int
+  chainId     Int
+  processedAt DateTime @default(now())
+
+  @@unique([txHash, logIndex, chainId])
+}

@@ -1,36 +1,57 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+A demo project exploring non-financial utility for writer coins through badge signaling in comment sections.
 
-## Getting Started
+## Goal
 
-First, run the development server:
+This project explores community-building utility for writer coins by surfacing token holdings as badges. Thought it was a low-touch way to signal potential other utility-based use cases for writer coins.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+The comment section felt like a clean, simple surface area for this (and this section might become more relevant as Farcaster moves away from social features).
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Tech Stack
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **Next.js 15** (App Router)
+- **Prisma + PostgreSQL** (via Neon)
+- **Redis** (via Upstash REST client)
+- **TypeScript**
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+**Key design decisions:**
 
-## Learn More
+- **Single endpoint** (`/api/posts/[postId]/comments`) returns comments + badges in one response. Avoids client-side orchestration and URL length issues from passing userIds.
+- **Batch cache lookups** - parallel Redis gets for all commenters, single DB query for cache misses.
 
-To learn more about Next.js, take a look at the following resources:
+## Perf Demo Panel
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+The UI includes a performance panel to test cache behavior:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- **Cold cache** - flush Redis and observe cache misses
+- **Warm cache** - subsequent requests show cache hits
+- **Burst x5** - fire 5 parallel requests to test under load
 
-## Deploy on Vercel
+## Notes
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Built this way specifically to touch on topics discussed during our call (caching patterns, useEffect usage). Would likely implement differently otherwise (e.g., server components for data fetching, or a dedicated data layer).
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Kind of a moot demo project at this point, but enjoyed building this out regardless :)
+
+## Local Setup
+
+1. Clone and install dependencies:
+   ```bash
+   pnpm install
+   ```
+2. Create `.env.local` with:
+   ```bash
+   DATABASE_URL=postgres://...
+   UPSTASH_REDIS_REST_URL=...
+   UPSTASH_REDIS_REST_TOKEN=...
+   ALLOW_DEV_ENDPOINTS=true
+   ```
+3. Run migrations and seed data:
+   ```bash
+   pnpm dlx prisma migrate deploy
+   pnpm dlx tsx prisma/seed.ts
+   pnpm dlx tsx prisma/seed-comments.ts
+   ```
+4. Start the app:
+   ```bash
+   pnpm dev
+   ```
